@@ -1,6 +1,6 @@
-# OpenClaw Platform
+# One Assist
 
-Multi-tenant SaaS platform for deploying personal OpenClaw AI assistants connected to Slack.
+Multi-tenant SaaS platform for deploying personal One Assist AI assistants connected to Slack.
 
 ## Stack
 - Next.js 14 (App Router)
@@ -15,4 +15,4 @@ Multi-tenant SaaS platform for deploying personal OpenClaw AI assistants connect
 4. `pnpm dev`
 
 ## Design
-See `docs/plans/2026-04-02-openclaw-platform-design.md` in the Hary-ai repo.
+See `docs/plans/2026-04-02-openclaw-platform-design.md` in the Hary-ai repo (historical filename).

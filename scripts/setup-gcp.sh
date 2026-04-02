@@ -1,15 +1,15 @@
 #!/bin/bash
 # scripts/setup-gcp.sh
-# Run this once to set up the GCP project for OpenClaw Platform
+# Run this once to set up the GCP project for One Assist
 
 set -euo pipefail
 
-PROJECT_ID="openclaw-platform"
+PROJECT_ID="one-assist"
 REGION="us-central1"
-TF_STATE_BUCKET="openclaw-platform-tf-state"
+TF_STATE_BUCKET="one-assist-tf-state"
 
 echo "=== Creating GCP Project ==="
-gcloud projects create $PROJECT_ID --name="OpenClaw Platform" || echo "Project exists"
+gcloud projects create $PROJECT_ID --name="One Assist" || echo "Project exists"
 gcloud config set project $PROJECT_ID
 
 echo "=== Enabling APIs ==="
@@ -20,20 +20,20 @@ echo "=== Creating Terraform state bucket ==="
 gcloud storage buckets create gs://$TF_STATE_BUCKET --location=$REGION || echo "Bucket exists"
 
 echo "=== Creating service account ==="
-gcloud iam service-accounts create openclaw-terraform \
-  --display-name="OpenClaw Terraform" || echo "SA exists"
+gcloud iam service-accounts create one-assist-terraform \
+  --display-name="One Assist Terraform" || echo "SA exists"
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:openclaw-terraform@$PROJECT_ID.iam.gserviceaccount.com" \
+  --member="serviceAccount:one-assist-terraform@$PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/compute.admin"
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
-  --member="serviceAccount:openclaw-terraform@$PROJECT_ID.iam.gserviceaccount.com" \
+  --member="serviceAccount:one-assist-terraform@$PROJECT_ID.iam.gserviceaccount.com" \
   --role="roles/storage.admin"
 
 echo "=== Generating key file ==="
 gcloud iam service-accounts keys create ./terraform-sa-key.json \
-  --iam-account=openclaw-terraform@$PROJECT_ID.iam.gserviceaccount.com
+  --iam-account=one-assist-terraform@$PROJECT_ID.iam.gserviceaccount.com
 
 echo "=== Initializing Terraform ==="
 cd terraform

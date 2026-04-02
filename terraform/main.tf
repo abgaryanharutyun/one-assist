@@ -7,7 +7,7 @@ terraform {
   }
 
   backend "gcs" {
-    bucket = "openclaw-platform-tf-state"
+    bucket = "one-assist-tf-state"
     prefix = "tenants"
   }
 }
@@ -17,17 +17,17 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_compute_address" "openclaw" {
-  name   = "openclaw-ip-${var.tenant_id}"
+resource "google_compute_address" "one-assist" {
+  name   = "one-assist-ip-${var.tenant_id}"
   region = var.region
 }
 
-resource "google_compute_instance" "openclaw" {
-  name         = "openclaw-${var.tenant_id}"
+resource "google_compute_instance" "one-assist" {
+  name         = "one-assist-${var.tenant_id}"
   machine_type = "e2-small"
   zone         = var.zone
 
-  tags = ["openclaw", "http-server", "https-server"]
+  tags = ["one-assist", "http-server", "https-server"]
 
   boot_disk {
     initialize_params {
@@ -39,7 +39,7 @@ resource "google_compute_instance" "openclaw" {
   network_interface {
     network = "default"
     access_config {
-      nat_ip = google_compute_address.openclaw.address
+      nat_ip = google_compute_address.one-assist.address
     }
   }
 
@@ -54,12 +54,12 @@ resource "google_compute_instance" "openclaw" {
 
   labels = {
     tenant = var.tenant_id
-    app    = "openclaw"
+    app    = "one-assist"
   }
 }
 
-resource "google_compute_firewall" "openclaw_https" {
-  name    = "openclaw-https-${var.tenant_id}"
+resource "google_compute_firewall" "one-assist_https" {
+  name    = "one-assist-https-${var.tenant_id}"
   network = "default"
 
   allow {
@@ -68,5 +68,5 @@ resource "google_compute_firewall" "openclaw_https" {
   }
 
   source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["openclaw"]
+  target_tags   = ["one-assist"]
 }

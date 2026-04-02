@@ -11,7 +11,7 @@ export interface SlackAppCredentials {
 export async function createSlackApp(
   configToken: string,
   appName: string,
-  redirectUrl: string
+  redirectUrl: string,
 ): Promise<{ credentials: SlackAppCredentials; oauthUrl: string }> {
   const manifest = {
     _metadata: { major_version: 1, minor_version: 1 },
@@ -34,17 +34,25 @@ export async function createSlackApp(
       redirect_urls: [redirectUrl],
       scopes: {
         bot: [
-          "app_mentions:read",
-          "channels:read",
           "chat:write",
-          "chat:write.public",
-          "groups:read",
+          "channels:history",
+          "channels:read",
+          "groups:history",
+          "im:history",
           "im:read",
           "im:write",
-          "im:history",
+          "mpim:history",
+          "mpim:read",
+          "mpim:write",
           "users:read",
+          "app_mentions:read",
+          "assistant:write",
           "reactions:read",
           "reactions:write",
+          "pins:read",
+          "pins:write",
+          "emoji:read",
+          "commands",
           "files:read",
           "files:write",
         ],
@@ -53,14 +61,18 @@ export async function createSlackApp(
     settings: {
       event_subscriptions: {
         bot_events: [
-          "app_home_opened",
           "app_mention",
           "message.channels",
           "message.groups",
           "message.im",
           "message.mpim",
           "reaction_added",
+          "reaction_removed",
           "member_joined_channel",
+          "member_left_channel",
+          "channel_rename",
+          "pin_added",
+          "pin_removed",
         ],
       },
       interactivity: { is_enabled: true },
@@ -94,8 +106,7 @@ export async function createSlackApp(
   };
 
   const scopes = manifest.oauth_config.scopes.bot.join(",");
-  const oauthUrl =
-    `https://slack.com/oauth/v2/authorize?client_id=${credentials.clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUrl)}`;
+  const oauthUrl = `https://slack.com/oauth/v2/authorize?client_id=${credentials.clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUrl)}`;
 
   return { credentials, oauthUrl };
 }
@@ -104,7 +115,7 @@ export async function exchangeCodeForTokens(
   code: string,
   clientId: string,
   clientSecret: string,
-  redirectUri: string
+  redirectUri: string,
 ): Promise<{
   accessToken: string;
   refreshToken: string;
