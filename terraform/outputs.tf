@@ -1,11 +1,11 @@
 output "vm_ip" {
-  value = google_compute_address.openclaw.address
+  value = google_compute_address.one-assist.address
 }
 
 output "vm_name" {
-  value = google_compute_instance.openclaw.name
+  value = google_compute_instance.one-assist.name
 }
 
 output "openclaw_url" {
-  value = "https://${var.tenant_id}.${var.domain}"
+  value = "https://${local.tenant_fqdn}"
 }

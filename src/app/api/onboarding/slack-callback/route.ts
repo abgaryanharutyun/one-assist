@@ -39,26 +39,36 @@ export async function GET(request: Request) {
       redirectUri
     );
 
-    // Update tenant with tokens and trigger provisioning
+    // Update tenant with tokens, set status to provisioning
     await supabase
       .from("tenants")
       .update({
         slack_access_token: tokens.accessToken,
         slack_refresh_token: tokens.refreshToken,
         slack_workspace_name: tokens.teamName,
+        slack_authed_user_id: tokens.authedUserId,
         status: "provisioning",
       })
       .eq("user_id", user.id);
 
-    // Trigger VM provisioning
-    await fetch(`${origin}/api/provision`, {
+    // Get tenant ID for provisioning
+    const { data: fullTenant } = await supabase
+      .from("tenants")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+
+    // Fire-and-forget provisioning — don't await
+    fetch(`${origin}/api/provision`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id }),
-    });
+      body: JSON.stringify({ tenantId: fullTenant!.id }),
+    }).catch((err) => console.error("[slack-callback] Provision trigger failed:", err));
 
+    // Redirect immediately — dashboard will poll for status
     return NextResponse.redirect(`${origin}/dashboard`);
-  } catch {
+  } catch (err) {
+    console.error("[slack-callback] Error:", err);
     return NextResponse.redirect(`${origin}/onboarding?error=token_exchange_failed`);
   }
 }

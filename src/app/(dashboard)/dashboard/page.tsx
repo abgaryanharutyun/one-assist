@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { RefreshButton } from "@/components/dashboard/refresh-button";
+import { GatewayLoader } from "@/components/dashboard/gateway-loader";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -10,7 +10,7 @@ export default async function DashboardPage() {
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("*")
+    .select("*, gateway_token")
     .eq("user_id", user.id)
     .single();
 
@@ -36,11 +36,12 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {tenant.status === "provisioning" && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
-            Setting up your AI assistant... This usually takes 1-2 minutes.
-            <RefreshButton />
-          </div>
+        {(tenant.status === "provisioning" || tenant.status === "active") && !tenant.openclaw_url && (
+          <GatewayLoader />
+        )}
+
+        {tenant.status === "active" && tenant.openclaw_url && (
+          <GatewayLoader openclawUrl={tenant.openclaw_url} gatewayToken={tenant.gateway_token} />
         )}
 
         {tenant.status === "error" && (
@@ -49,16 +50,6 @@ export default async function DashboardPage() {
           </div>
         )}
 
-        {tenant.status === "active" && tenant.openclaw_url && (
-          <a
-            href={tenant.openclaw_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-block px-6 py-3 bg-black text-white rounded-lg hover:bg-gray-800"
-          >
-            Open OpenClaw Dashboard
-          </a>
-        )}
       </div>
     </div>
   );

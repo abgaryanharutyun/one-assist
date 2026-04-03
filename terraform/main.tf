@@ -17,9 +17,24 @@ provider "google" {
   region  = var.region
 }
 
+# Use first 8 chars of tenant UUID for short subdomain
+locals {
+  tenant_short = substr(var.tenant_id, 0, 8)
+  tenant_fqdn  = "${local.tenant_short}.${var.domain}"
+}
+
 resource "google_compute_address" "one-assist" {
   name   = "one-assist-ip-${var.tenant_id}"
   region = var.region
+}
+
+# DNS A record for tenant subdomain
+resource "google_dns_record_set" "tenant" {
+  name         = "${local.tenant_fqdn}."
+  type         = "A"
+  ttl          = 300
+  managed_zone = var.dns_zone_name
+  rrdatas      = [google_compute_address.one-assist.address]
 }
 
 resource "google_compute_instance" "one-assist" {
@@ -45,17 +60,30 @@ resource "google_compute_instance" "one-assist" {
 
   metadata_startup_script = templatefile("${path.module}/scripts/startup.sh", {
     tenant_id         = var.tenant_id
-    slack_bot_token   = var.slack_bot_token
-    slack_app_token   = var.slack_app_token
-    anthropic_api_key = var.anthropic_api_key
+    tenant_fqdn       = local.tenant_fqdn
+    slack_bot_token      = var.slack_bot_token
+    slack_signing_secret  = var.slack_signing_secret
+    slack_authed_user_id  = var.slack_authed_user_id
+    ai_provider       = var.ai_provider
+    ai_api_key        = var.ai_api_key
+    instance_ip       = google_compute_address.one-assist.address
     gateway_token     = var.gateway_token
-    domain            = var.domain
+    letsencrypt_email = var.letsencrypt_email
   })
+
+  scheduling {
+    provisioning_model  = "SPOT"
+    preemptible         = true
+    automatic_restart   = false
+    instance_termination_action = "STOP"
+  }
 
   labels = {
     tenant = var.tenant_id
     app    = "one-assist"
   }
+
+  depends_on = [google_dns_record_set.tenant]
 }
 
 resource "google_compute_firewall" "one-assist_https" {

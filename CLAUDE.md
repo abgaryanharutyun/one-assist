@@ -66,8 +66,8 @@ Single `tenants` table with RLS (users can only access their own row). Status en
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SECRET_KEY=
 GCP_PROJECT_ID=one-assist
 GCP_CREDENTIALS_PATH=/path/to/terraform-sa-key.json
 ANTHROPIC_API_KEY=

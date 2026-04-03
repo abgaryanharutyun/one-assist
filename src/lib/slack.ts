@@ -1,4 +1,4 @@
-const SLACK_API = "https://slack.com/api";
+import { WebClient } from "@slack/web-api";
 
 export interface SlackAppCredentials {
   appId: string;
@@ -8,24 +8,18 @@ export interface SlackAppCredentials {
   verificationToken: string;
 }
 
-export async function createSlackApp(
-  configToken: string,
-  appName: string,
-  redirectUrl: string,
-): Promise<{ credentials: SlackAppCredentials; oauthUrl: string }> {
-  const manifest = {
-    _metadata: { major_version: 1, minor_version: 1 },
+function buildManifest(appName: string, redirectUrl: string) {
+  return {
     display_information: {
       name: appName,
-      description: `${appName} - AI Assistant powered by OpenClaw`,
+      description: "Slack connector for OpenClaw",
     },
     features: {
       bot_user: {
         display_name: appName,
-        always_online: true,
+        always_online: false,
       },
       app_home: {
-        home_tab_enabled: true,
         messages_tab_enabled: true,
         messages_tab_read_only_enabled: false,
       },
@@ -59,7 +53,30 @@ export async function createSlackApp(
       },
     },
     settings: {
+      socket_mode_enabled: false,
+    },
+  };
+}
+
+function buildManifestWithUrls(appName: string, redirectUrl: string, eventsUrl: string) {
+  const manifest = buildManifest(appName, redirectUrl);
+  return {
+    ...manifest,
+    features: {
+      ...manifest.features,
+      slash_commands: [
+        {
+          command: "/openclaw",
+          description: "Send a message to OpenClaw",
+          url: eventsUrl,
+          should_escape: false,
+        },
+      ],
+    },
+    settings: {
+      ...manifest.settings,
       event_subscriptions: {
+        request_url: eventsUrl,
         bot_events: [
           "app_mention",
           "message.channels",
@@ -75,40 +92,68 @@ export async function createSlackApp(
           "pin_removed",
         ],
       },
-      interactivity: { is_enabled: true },
-      org_deploy_enabled: false,
-      socket_mode_enabled: true,
-      token_rotation_enabled: true,
+      interactivity: {
+        is_enabled: true,
+        request_url: eventsUrl,
+      },
     },
   };
+}
 
-  const res = await fetch(`${SLACK_API}/apps.manifest.create`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${configToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ manifest: JSON.stringify(manifest) }),
+export async function createSlackApp(
+  configToken: string,
+  appName: string,
+  redirectUrl: string,
+): Promise<{ credentials: SlackAppCredentials; oauthUrl: string }> {
+  const client = new WebClient(configToken);
+  const manifest = buildManifest(appName, redirectUrl);
+
+  const result = await client.apiCall("apps.manifest.create", {
+    manifest: JSON.stringify(manifest),
   });
 
-  const data = await res.json();
-
-  if (!data.ok) {
-    throw new Error(data.error || "Failed to create Slack app");
+  if (!result.ok) {
+    const errors = (result as unknown as Record<string, unknown>).errors;
+    const detail = errors ? JSON.stringify(errors) : (result.error as string);
+    throw new Error(detail || "Failed to create Slack app");
   }
 
+  const r = result as unknown as Record<string, unknown>;
+  const creds = r.credentials as Record<string, string>;
   const credentials: SlackAppCredentials = {
-    appId: data.app_id,
-    clientId: data.credentials.client_id,
-    clientSecret: data.credentials.client_secret,
-    signingSecret: data.credentials.signing_secret,
-    verificationToken: data.credentials.verification_token,
+    appId: r.app_id as string,
+    clientId: creds.client_id,
+    clientSecret: creds.client_secret,
+    signingSecret: creds.signing_secret,
+    verificationToken: creds.verification_token,
   };
 
   const scopes = manifest.oauth_config.scopes.bot.join(",");
   const oauthUrl = `https://slack.com/oauth/v2/authorize?client_id=${credentials.clientId}&scope=${scopes}&redirect_uri=${encodeURIComponent(redirectUrl)}`;
 
   return { credentials, oauthUrl };
+}
+
+export async function updateSlackAppWithEventsUrl(
+  configToken: string,
+  appId: string,
+  appName: string,
+  redirectUrl: string,
+  eventsUrl: string,
+): Promise<void> {
+  const client = new WebClient(configToken);
+  const manifest = buildManifestWithUrls(appName, redirectUrl, eventsUrl);
+
+  const result = await client.apiCall("apps.manifest.update", {
+    app_id: appId,
+    manifest: JSON.stringify(manifest),
+  });
+
+  if (!result.ok) {
+    const errors = (result as unknown as Record<string, unknown>).errors;
+    const detail = errors ? JSON.stringify(errors) : (result.error as string);
+    throw new Error(`Failed to update Slack app manifest: ${detail}`);
+  }
 }
 
 export async function exchangeCodeForTokens(
@@ -122,29 +167,28 @@ export async function exchangeCodeForTokens(
   teamName: string;
   teamId: string;
   botUserId: string;
+  authedUserId: string;
 }> {
-  const res = await fetch(`${SLACK_API}/oauth.v2.access`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      code,
-      redirect_uri: redirectUri,
-    }),
+  const client = new WebClient();
+
+  const result = await client.oauth.v2.access({
+    client_id: clientId,
+    client_secret: clientSecret,
+    code,
+    redirect_uri: redirectUri,
   });
 
-  const data = await res.json();
-
-  if (!data.ok) {
-    throw new Error(data.error || "OAuth token exchange failed");
+  if (!result.ok) {
+    throw new Error((result.error as string) || "OAuth token exchange failed");
   }
 
+  const authedUser = (result as unknown as Record<string, any>).authed_user;
   return {
-    accessToken: data.access_token,
-    refreshToken: data.refresh_token || "",
-    teamName: data.team?.name || "",
-    teamId: data.team?.id || "",
-    botUserId: data.bot_user_id || "",
+    accessToken: result.access_token || "",
+    refreshToken: result.refresh_token || "",
+    teamName: result.team?.name || "",
+    teamId: result.team?.id || "",
+    botUserId: result.bot_user_id || "",
+    authedUserId: authedUser?.id || "",
   };
 }

@@ -6,9 +6,13 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "npx supabase db push --linked",
+    "db:migrate:new": "npx supabase migration new",
+    "db:migrate:list": "npx supabase migration list --linked"
   },
   "dependencies": {
+    "@slack/web-api": "^7.15.0",
     "@supabase/ssr": "^0.10.0",
     "@supabase/supabase-js": "^2.101.1",
     "next": "16.2.2",

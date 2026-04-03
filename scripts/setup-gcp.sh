@@ -4,12 +4,12 @@
 
 set -euo pipefail
 
-PROJECT_ID="one-assist"
+PROJECT_ID="one-assist-123456"
 REGION="us-central1"
 TF_STATE_BUCKET="one-assist-tf-state"
 
-echo "=== Creating GCP Project ==="
-gcloud projects create $PROJECT_ID --name="One Assist" || echo "Project exists"
+# echo "=== Creating GCP Project ==="
+# gcloud projects create $PROJECT_ID --name="One Assist" || echo "Project exists"
 gcloud config set project $PROJECT_ID
 
 echo "=== Enabling APIs ==="

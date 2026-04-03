@@ -6,13 +6,13 @@ variable "project_id" {
 variable "region" {
   description = "GCP region"
   type        = string
-  default     = "us-central1"
+  default     = "us-south1"
 }
 
 variable "zone" {
   description = "GCP zone"
   type        = string
-  default     = "us-central1-a"
+  default     = "us-south1-a"
 }
 
 variable "tenant_id" {
@@ -26,14 +26,26 @@ variable "slack_bot_token" {
   sensitive   = true
 }
 
-variable "slack_app_token" {
-  description = "Slack app token"
+variable "slack_signing_secret" {
+  description = "Slack signing secret for Events API verification"
   type        = string
   sensitive   = true
 }
 
-variable "anthropic_api_key" {
-  description = "Anthropic API key for OpenClaw"
+variable "slack_authed_user_id" {
+  description = "Slack user ID of the person who authorized the app"
+  type        = string
+  default     = ""
+}
+
+variable "ai_provider" {
+  description = "AI provider name (anthropic or openai)"
+  type        = string
+  default     = "anthropic"
+}
+
+variable "ai_api_key" {
+  description = "AI provider API key for OpenClaw"
   type        = string
   sensitive   = true
 }
@@ -45,6 +57,16 @@ variable "gateway_token" {
 }
 
 variable "domain" {
-  description = "Base domain for tenant subdomains"
+  description = "Base domain for tenant subdomains (e.g. app.yourdomain.com)"
+  type        = string
+}
+
+variable "dns_zone_name" {
+  description = "Cloud DNS managed zone name"
+  type        = string
+}
+
+variable "letsencrypt_email" {
+  description = "Email for Let's Encrypt certificate registration"
   type        = string
 }

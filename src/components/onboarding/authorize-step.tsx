@@ -5,8 +5,10 @@ import { useState } from "react";
 interface Props {
   data: {
     configToken: string;
+    configRefreshToken: string;
     appName: string;
-    appImage: File | null;
+    provider: string;
+    apiKey: string;
   };
   onBack: () => void;
 }
@@ -22,8 +24,10 @@ export function AuthorizeStep({ data, onBack }: Props) {
     try {
       const formData = new FormData();
       formData.append("configToken", data.configToken);
+      formData.append("configRefreshToken", data.configRefreshToken);
       formData.append("appName", data.appName);
-      if (data.appImage) formData.append("appImage", data.appImage);
+      formData.append("provider", data.provider);
+      formData.append("apiKey", data.apiKey);
 
       const res = await fetch("/api/onboarding/create-slack-app", {
         method: "POST",
@@ -57,7 +61,7 @@ export function AuthorizeStep({ data, onBack }: Props) {
 
       <div className="bg-gray-100 p-4 rounded-lg space-y-2 text-sm">
         <p><span className="font-medium">App name:</span> {data.appName}</p>
-        <p><span className="font-medium">Image:</span> {data.appImage?.name || "None"}</p>
+        <p><span className="font-medium">Provider:</span> {data.provider}</p>
         <p><span className="font-medium">Token:</span> {data.configToken.slice(0, 12)}...</p>
       </div>
 

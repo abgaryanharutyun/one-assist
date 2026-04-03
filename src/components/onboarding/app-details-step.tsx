@@ -1,18 +1,13 @@
 "use client";
 
-import { useRef } from "react";
-
 interface Props {
   appName: string;
-  appImage: File | null;
-  onChange: (fields: { appName?: string; appImage?: File | null }) => void;
+  onChange: (fields: { appName?: string }) => void;
   onBack: () => void;
   onNext: () => void;
 }
 
-export function AppDetailsStep({ appName, appImage, onChange, onBack, onNext }: Props) {
-  const fileRef = useRef<HTMLInputElement>(null);
-
+export function AppDetailsStep({ appName, onChange, onBack, onNext }: Props) {
   return (
     <div className="space-y-6">
       <div>
@@ -36,25 +31,11 @@ export function AppDetailsStep({ appName, appImage, onChange, onBack, onNext }: 
           <p className="text-xs text-gray-500 mt-1">{appName.length}/35 characters</p>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium mb-1">App image</label>
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:border-gray-400"
-          >
-            {appImage ? (
-              <p className="text-sm text-gray-700">{appImage.name}</p>
-            ) : (
-              <p className="text-sm text-gray-500">Click to upload an image (PNG or JPG)</p>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg"
-            className="hidden"
-            onChange={(e) => onChange({ appImage: e.target.files?.[0] || null })}
-          />
+        <div className="bg-gray-50 border rounded-lg p-4">
+          <p className="text-sm text-gray-600">
+            You can set a custom app icon after setup in your{" "}
+            <span className="font-medium">Slack app settings</span> under Display Information.
+          </p>
         </div>
       </div>
 
