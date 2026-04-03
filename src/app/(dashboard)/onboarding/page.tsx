@@ -1,62 +1,73 @@
 "use client";
 
 import { useState } from "react";
-import { SlackTokenStep } from "@/components/onboarding/slack-token-step";
-import { AppDetailsStep } from "@/components/onboarding/app-details-step";
-import { ApiKeyStep } from "@/components/onboarding/api-key-step";
-import { AuthorizeStep } from "@/components/onboarding/authorize-step";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function OnboardingPage() {
-  const [step, setStep] = useState(1);
-  const [data, setData] = useState({
-    configToken: "",
-    configRefreshToken: "",
-    appName: "",
-    provider: "anthropic",
-    apiKey: "",
-  });
+  const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const router = useRouter();
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/onboarding/create-org", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create organization");
+      }
+
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <div>
-      <div className="flex gap-2 mb-8">
-        {[1, 2, 3, 4].map((s) => (
-          <div
-            key={s}
-            className={`h-2 flex-1 rounded-full ${
-              s <= step ? "bg-black" : "bg-gray-200"
-            }`}
-          />
-        ))}
-      </div>
-
-      {step === 1 && (
-        <SlackTokenStep
-          configToken={data.configToken}
-          configRefreshToken={data.configRefreshToken}
-          onChange={(fields) => setData({ ...data, ...fields })}
-          onNext={() => setStep(2)}
-        />
-      )}
-      {step === 2 && (
-        <AppDetailsStep
-          appName={data.appName}
-          onChange={(fields) => setData({ ...data, ...fields })}
-          onBack={() => setStep(1)}
-          onNext={() => setStep(3)}
-        />
-      )}
-      {step === 3 && (
-        <ApiKeyStep
-          provider={data.provider}
-          apiKey={data.apiKey}
-          onChange={(fields) => setData({ ...data, ...fields })}
-          onBack={() => setStep(2)}
-          onNext={() => setStep(4)}
-        />
-      )}
-      {step === 4 && (
-        <AuthorizeStep data={data} onBack={() => setStep(3)} />
-      )}
+    <div className="flex items-center justify-center min-h-[60vh]">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle>Create your organization</CardTitle>
+          <CardDescription>
+            Give your organization a name to get started.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="name">Organization name</Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Acme Inc."
+                required
+              />
+            </div>
+            {error && (
+              <p className="text-sm text-red-600">{error}</p>
+            )}
+            <Button type="submit" className="w-full" disabled={loading || !name.trim()}>
+              {loading ? "Creating..." : "Create Organization"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
