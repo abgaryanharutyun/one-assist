@@ -1,17 +1,17 @@
 -- Rename table
 alter table tenants rename to agents;
 
+-- Drop old RLS policies FIRST (they depend on user_id column)
+drop policy if exists "Users can read own tenant" on agents;
+drop policy if exists "Users can insert own tenant" on agents;
+drop policy if exists "Users can update own tenant" on agents;
+
 -- Add organization_id column
 alter table agents add column organization_id uuid references organizations(id) on delete cascade;
 
 -- Drop old user_id unique constraint and column
 alter table agents drop constraint if exists tenants_user_id_key;
 alter table agents drop column user_id;
-
--- Drop old RLS policies (they reference user_id)
-drop policy if exists "Users can view own tenant" on agents;
-drop policy if exists "Users can insert own tenant" on agents;
-drop policy if exists "Users can update own tenant" on agents;
 
 -- New RLS policies based on org membership
 create policy "Users can view agents in their org"

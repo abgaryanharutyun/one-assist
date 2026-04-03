@@ -45,18 +45,13 @@ alter table org_members enable row level security;
 
 create policy "Users can view members of their orgs"
   on org_members for select
-  using (
-    organization_id in (
-      select organization_id from org_members where user_id = auth.uid()
-    )
-  );
+  using (user_id = auth.uid());
 
-create policy "Owners/admins can add members"
+create policy "Owners can add members"
   on org_members for insert
   with check (
+    -- Allow org creator to add themselves as first member
     organization_id in (
-      select organization_id from org_members where user_id = auth.uid() and role in ('owner', 'admin')
+      select id from organizations where created_by = auth.uid()
     )
-    or
-    not exists (select 1 from org_members where organization_id = org_members.organization_id)
   );

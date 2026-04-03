@@ -1,6 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { createOrganization } from "@/lib/organizations";
+import { createClient as createAdminClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+
+function getAdminClient() {
+  return createAdminClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SECRET_KEY!,
+  );
+}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -17,7 +24,27 @@ export async function POST(request: Request) {
   }
 
   try {
-    const org = await createOrganization(supabase, name.trim());
+    // Use admin client to bypass RLS — user is already authenticated above
+    const admin = getAdminClient();
+
+    const { data: org, error: orgError } = await admin
+      .from("organizations")
+      .insert({ name: name.trim(), created_by: user.id })
+      .select()
+      .single();
+
+    if (orgError) throw orgError;
+
+    const { error: memberError } = await admin
+      .from("org_members")
+      .insert({
+        organization_id: org.id,
+        user_id: user.id,
+        role: "owner",
+      });
+
+    if (memberError) throw memberError;
+
     return NextResponse.json({ organization: org });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
