@@ -20,7 +20,7 @@ function loadTerraformEnv(): Record<string, string> {
 }
 
 interface ProvisionInput {
-  tenantId: string;
+  agentId: string;
   slackBotToken: string;
   slackSigningSecret: string;
   slackAuthedUserId: string;
@@ -38,7 +38,7 @@ interface ProvisionOutput {
 export function provisionVM(input: ProvisionInput): ProvisionOutput {
   const tfEnv = loadTerraformEnv();
   const gatewayToken = randomBytes(32).toString("hex");
-  const workspace = `tenant-${input.tenantId}`;
+  const workspace = `agent-${input.agentId}`;
 
   const execOpts = {
     cwd: TF_DIR,
@@ -60,7 +60,7 @@ export function provisionVM(input: ProvisionInput): ProvisionOutput {
   // Run terraform apply
   const tfVars = [
     `-var="project_id=${tfEnv.GCP_PROJECT_ID}"`,
-    `-var="tenant_id=${input.tenantId}"`,
+    `-var="tenant_id=${input.agentId}"`,
     `-var="slack_bot_token=${input.slackBotToken}"`,
     `-var="slack_signing_secret=${input.slackSigningSecret}"`,
     `-var="slack_authed_user_id=${input.slackAuthedUserId}"`,
@@ -86,9 +86,9 @@ export function provisionVM(input: ProvisionInput): ProvisionOutput {
   };
 }
 
-export function destroyVM(tenantId: string): void {
+export function destroyVM(agentId: string): void {
   const tfEnv = loadTerraformEnv();
-  const workspace = `tenant-${tenantId}`;
+  const workspace = `agent-${agentId}`;
 
   const execOpts = {
     cwd: TF_DIR,

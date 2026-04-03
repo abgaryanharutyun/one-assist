@@ -30,7 +30,7 @@ export async function POST(request: Request) {
 
   try {
     const result = provisionVM({
-      tenantId: tenant.id,
+      agentId: tenant.id,
       slackBotToken: tenant.slack_access_token,
       slackSigningSecret: tenant.slack_signing_secret,
       slackAuthedUserId: tenant.slack_authed_user_id || "",
