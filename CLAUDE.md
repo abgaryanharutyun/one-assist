@@ -19,7 +19,7 @@ Multi-tenant SaaS platform where each organization can have multiple AI agents, 
 
 1. **Signup** → Supabase Auth (email/password)
 2. **Onboarding** → create organization (name only)
-3. **Add Agent wizard** (4 steps): paste Slack config token → set bot name → enter Anthropic API key → create app & OAuth authorize
+3. **Add Agent wizard** (5 steps): paste Slack config token → set bot name → select skills → enter Anthropic API key → create app & OAuth authorize
 4. **Provisioning** → API route runs `terraform apply` to spawn a GCP Compute Engine VM per agent
 5. **Post-provisioning** → Slack app manifest updated with webhook URL pointing to agent VM
 6. **Dashboard** → shows agent card grid with status + links to OpenClaw web UI (with gateway token auth)
@@ -39,6 +39,8 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 - `(auth)/` — login, signup (public, centered layout)
 - `(dashboard)/` — onboarding, dashboard (requires auth, header layout with signout)
 - `(dashboard)/agents/` — `new/` (add agent wizard), `[agentId]/` (agent detail/settings)
+- `(dashboard)/knowledge/` — knowledge base management
+- `(dashboard)/skills/` — skills library management
 
 ### API Routes
 
@@ -48,6 +50,18 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 | `/api/agents/create-slack-app` | POST | Creates Slack app from manifest for an agent, stores credentials, returns OAuth URL |
 | `/api/agents/slack-callback` | GET | Exchanges OAuth code for tokens, triggers agent provisioning |
 | `/api/agents/provision` | POST | Runs `terraform apply` for agent, updates DB with VM details, updates Slack manifest with webhook URL |
+| `/api/knowledge` | GET | List org's knowledge items |
+| `/api/knowledge` | POST | Create knowledge item (text → embed → store) |
+| `/api/knowledge/[id]` | DELETE | Delete knowledge item |
+| `/api/knowledge/search` | GET | Vector search (auth via gateway token, called by agent VMs) |
+| `/api/skills` | GET | List org's skills |
+| `/api/skills` | POST | Create skill |
+| `/api/skills/[id]` | PUT | Update skill |
+| `/api/skills/[id]` | DELETE | Delete skill |
+| `/api/agents/[agentId]/skills` | GET | List agent's assigned skills |
+| `/api/agents/[agentId]/skills` | POST | Assign skill to agent |
+| `/api/agents/[agentId]/skills/[skillId]` | DELETE | Remove skill from agent |
+| `/api/agents/[agentId]/sync` | GET | Returns agent's skills + knowledge search config (called by VM) |
 | `/api/auth/signout` | POST | Signs out, redirects to `/login` |
 | `/api/health` | GET | Health check endpoint |
 
@@ -65,6 +79,9 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 - `startup.sh` is a Terraform `templatefile()` — variables substituted at apply time, not shell runtime
 - VM runs OpenClaw as systemd service on `localhost:18789`, proxied via Nginx with Let's Encrypt SSL
 - Agent subdomain: `{short-id}.{PLATFORM_DOMAIN}` (e.g. `abc123.local.oneassist.app`)
+- `openclaw-sync.timer` runs every 5 minutes to pull skills from platform via `/api/agents/{agentId}/sync`
+- Skills written to `/home/openclaw/.openclaw/workspace/skills/{slug}/SKILL.md`
+- Built-in `knowledge-search` skill auto-injected with platform search API URL
 
 ### OpenClaw VM Configuration
 
@@ -76,10 +93,13 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 
 ### Database
 
-Three main tables with RLS:
+Six main tables with RLS:
 - `organizations` — org name, created_by user
 - `org_members` — links users to organizations (role-based membership)
 - `agents` — each agent belongs to an organization (`organization_id`). Status enum: `onboarding` → `provisioning` → `active` (or `error`/`stopped`). Multiple agents per org.
+- `knowledge_items` — org-level knowledge with pgvector embeddings (1536 dims, text-embedding-3-small)
+- `skills` — org-level skill library (name, slug, instructions markdown, optional script)
+- `agent_skills` — junction table for agent-skill assignments
 
 Migrations in `supabase/migrations/`:
 - `001_create_tenants.sql` — base tenants table (legacy)
@@ -89,6 +109,8 @@ Migrations in `supabase/migrations/`:
 - `005_add_slack_authed_user_id.sql` — Slack authed user ID for access control
 - `006_create_organizations.sql` — organizations and org_members tables
 - `007_create_agents.sql` — agents table (replaces tenants for new architecture)
+- `009_create_org_invites.sql` — organization invites with token-based acceptance
+- `010_knowledge_skills.sql` — knowledge_items, skills, agent_skills tables + pgvector + match_knowledge RPC
 
 ## Environment Variables (.env.local)
 
@@ -102,6 +124,8 @@ ANTHROPIC_API_KEY=
 PLATFORM_DOMAIN=local.oneassist.app
 GCP_DNS_ZONE_NAME=local-oneassist-zone
 LETSENCRYPT_EMAIL=your@email.com
+OPENAI_API_KEY=              # For knowledge embedding (text-embedding-3-small)
+PLATFORM_URL=                # Public URL of the platform (for agent VM sync)
 ```
 
 ## Setup

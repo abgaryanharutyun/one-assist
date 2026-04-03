@@ -17,6 +17,8 @@ export async function POST(request: Request) {
   const appName = formData.get("appName") as string;
   const provider = formData.get("provider") as string;
   const apiKey = formData.get("apiKey") as string;
+  const selectedSkillsRaw = formData.get("selectedSkills") as string;
+  const selectedSkills: string[] = selectedSkillsRaw ? JSON.parse(selectedSkillsRaw) : [];
 
   if (!configToken || !configRefreshToken || !appName || !apiKey) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -44,6 +46,17 @@ export async function POST(request: Request) {
     }).select("id").single();
 
     if (error) throw error;
+
+    // Assign selected skills to agent
+    if (selectedSkills.length > 0) {
+      const { error: skillError } = await supabase
+        .from("agent_skills")
+        .insert(selectedSkills.map((skillId) => ({
+          agent_id: agent.id,
+          skill_id: skillId,
+        })));
+      if (skillError) console.error("Failed to assign skills:", skillError);
+    }
 
     // Append agentId as state param to OAuth URL so callback knows which agent
     const oauthUrlWithState = `${oauthUrl}&state=${agent.id}`;

@@ -9,6 +9,7 @@ interface Props {
     appName: string;
     provider: string;
     apiKey: string;
+    selectedSkills: string[];
   };
   onBack: () => void;
 }
@@ -28,6 +29,7 @@ export function AuthorizeStep({ data, onBack }: Props) {
       formData.append("appName", data.appName);
       formData.append("provider", data.provider);
       formData.append("apiKey", data.apiKey);
+      formData.append("selectedSkills", JSON.stringify(data.selectedSkills));
 
       const res = await fetch("/api/agents/create-slack-app", {
         method: "POST",

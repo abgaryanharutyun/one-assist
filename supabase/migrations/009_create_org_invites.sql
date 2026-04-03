@@ -1,9 +1,12 @@
+-- Enable pgcrypto for gen_random_bytes
+create extension if not exists pgcrypto;
+
 -- Organization invites
 create table org_invites (
   id uuid primary key default gen_random_uuid(),
   organization_id uuid references organizations(id) on delete cascade not null,
   invited_by uuid references auth.users(id) not null,
-  token text not null unique default encode(gen_random_bytes(32), 'hex'),
+  token text not null unique,
   role text not null default 'member' check (role in ('member', 'admin')),
   status text not null default 'pending' check (status in ('pending', 'accepted', 'expired')),
   created_at timestamptz default now(),

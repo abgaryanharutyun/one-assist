@@ -1,6 +1,6 @@
 import { execSync } from "child_process";
 import { randomBytes } from "crypto";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync, unlinkSync } from "fs";
 import path from "path";
 
 const TF_DIR = path.resolve(process.cwd(), "terraform");
@@ -21,11 +21,20 @@ function loadTerraformEnv(): Record<string, string> {
 
 interface ProvisionInput {
   agentId: string;
+  organizationId: string;
   slackBotToken: string;
   slackSigningSecret: string;
   slackAuthedUserId: string;
   aiProvider: string;
   aiApiKey: string;
+  initialSkills?: Array<{
+    name: string;
+    slug: string;
+    description: string;
+    instructions: string;
+    script?: string | null;
+    script_language?: string | null;
+  }>;
 }
 
 interface ProvisionOutput {
@@ -57,22 +66,32 @@ export function provisionVM(input: ProvisionInput): ProvisionOutput {
     execSync(`terraform workspace new ${workspace}`, execOpts);
   }
 
-  // Run terraform apply
-  const tfVars = [
-    `-var="project_id=${tfEnv.GCP_PROJECT_ID}"`,
-    `-var="tenant_id=${input.agentId}"`,
-    `-var="slack_bot_token=${input.slackBotToken}"`,
-    `-var="slack_signing_secret=${input.slackSigningSecret}"`,
-    `-var="slack_authed_user_id=${input.slackAuthedUserId}"`,
-    `-var="ai_provider=${input.aiProvider}"`,
-    `-var="ai_api_key=${input.aiApiKey}"`,
-    `-var="gateway_token=${gatewayToken}"`,
-    `-var="domain=${tfEnv.PLATFORM_DOMAIN}"`,
-    `-var="dns_zone_name=${tfEnv.GCP_DNS_ZONE_NAME}"`,
-    `-var="letsencrypt_email=${tfEnv.LETSENCRYPT_EMAIL}"`,
-  ].join(" ");
+  // Write tfvars JSON file to avoid shell escaping issues
+  const tfVarsFile = path.join(TF_DIR, ".auto.tfvars.json");
+  const tfVarsData = {
+    project_id: tfEnv.GCP_PROJECT_ID,
+    tenant_id: input.agentId,
+    slack_bot_token: input.slackBotToken,
+    slack_signing_secret: input.slackSigningSecret,
+    slack_authed_user_id: input.slackAuthedUserId,
+    ai_provider: input.aiProvider,
+    ai_api_key: input.aiApiKey,
+    gateway_token: gatewayToken,
+    domain: tfEnv.PLATFORM_DOMAIN,
+    dns_zone_name: tfEnv.GCP_DNS_ZONE_NAME,
+    letsencrypt_email: tfEnv.LETSENCRYPT_EMAIL,
+    platform_url: tfEnv.PLATFORM_URL || "",
+    agent_id: input.agentId,
+    org_id: input.organizationId,
+    initial_skills_json: JSON.stringify(input.initialSkills || []),
+  };
+  writeFileSync(tfVarsFile, JSON.stringify(tfVarsData, null, 2));
 
-  execSync(`terraform apply -auto-approve ${tfVars}`, execOpts);
+  try {
+    execSync(`terraform apply -auto-approve -var-file=.auto.tfvars.json`, execOpts);
+  } finally {
+    try { unlinkSync(tfVarsFile); } catch {}
+  }
 
   // Get outputs
   const output = execSync("terraform output -json", { ...execOpts, encoding: "utf-8" });

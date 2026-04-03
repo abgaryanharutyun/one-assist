@@ -3,9 +3,12 @@
 import { useState } from "react";
 import { SlackTokenStep } from "@/components/onboarding/slack-token-step";
 import { AppDetailsStep } from "@/components/onboarding/app-details-step";
+import { SkillSelectionStep } from "@/components/onboarding/skill-selection-step";
 import { ApiKeyStep } from "@/components/onboarding/api-key-step";
 import { AuthorizeStep } from "@/components/onboarding/authorize-step";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+const TOTAL_STEPS = 5;
 
 export default function NewAgentPage() {
   const [step, setStep] = useState(1);
@@ -15,6 +18,7 @@ export default function NewAgentPage() {
     appName: "",
     provider: "anthropic",
     apiKey: "",
+    selectedSkills: [] as string[],
   });
 
   return (
@@ -25,7 +29,7 @@ export default function NewAgentPage() {
         </CardHeader>
         <CardContent>
           <div className="flex gap-2 mb-8">
-            {[1, 2, 3, 4].map((s) => (
+            {Array.from({ length: TOTAL_STEPS }, (_, i) => i + 1).map((s) => (
               <div
                 key={s}
                 className={`h-2 flex-1 rounded-full ${
@@ -52,16 +56,24 @@ export default function NewAgentPage() {
             />
           )}
           {step === 3 && (
-            <ApiKeyStep
-              provider={data.provider}
-              apiKey={data.apiKey}
-              onChange={(fields) => setData({ ...data, ...fields })}
+            <SkillSelectionStep
+              selectedSkills={data.selectedSkills}
+              onChange={(skills) => setData({ ...data, selectedSkills: skills })}
               onBack={() => setStep(2)}
               onNext={() => setStep(4)}
             />
           )}
           {step === 4 && (
-            <AuthorizeStep data={data} onBack={() => setStep(3)} />
+            <ApiKeyStep
+              provider={data.provider}
+              apiKey={data.apiKey}
+              onChange={(fields) => setData({ ...data, ...fields })}
+              onBack={() => setStep(3)}
+              onNext={() => setStep(5)}
+            />
+          )}
+          {step === 5 && (
+            <AuthorizeStep data={data} onBack={() => setStep(4)} />
           )}
         </CardContent>
       </Card>

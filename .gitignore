@@ -45,3 +45,4 @@ terraform-sa-key.json
 
 # Terraform
 terraform/.terraform/
+terraform/.auto.tfvars.json

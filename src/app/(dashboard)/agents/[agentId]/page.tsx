@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { GatewayLoader } from "@/components/dashboard/gateway-loader";
+import { AgentSkills } from "@/components/dashboard/agent-skills";
 import Link from "next/link";
 
 export default async function AgentDetailPage({
@@ -70,6 +71,15 @@ export default async function AgentDetailPage({
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Skills</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AgentSkills agentId={agent.id} />
+        </CardContent>
+      </Card>
 
       {agent.status === "error" && (
         <Card className="border-destructive">

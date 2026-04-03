@@ -70,3 +70,25 @@ variable "letsencrypt_email" {
   description = "Email for Let's Encrypt certificate registration"
   type        = string
 }
+
+variable "platform_url" {
+  description = "Base URL of the One Assist platform (for agent sync)"
+  type        = string
+  default     = ""
+}
+
+variable "initial_skills_json" {
+  description = "JSON-encoded array of skills to write on first boot"
+  type        = string
+  default     = "[]"
+}
+
+variable "agent_id" {
+  description = "Agent UUID (for sync endpoint)"
+  type        = string
+}
+
+variable "org_id" {
+  description = "Organization UUID (for resource identification)"
+  type        = string
+}

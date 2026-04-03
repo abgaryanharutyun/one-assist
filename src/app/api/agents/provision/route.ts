@@ -27,14 +27,25 @@ export async function POST(request: Request) {
 
   console.log("[provision] Starting provisioning for agent:", agent.id);
 
+  // Fetch assigned skills to bake into the VM
+  const { data: assignments } = await supabase
+    .from("agent_skills")
+    .select("skills(id, name, slug, description, instructions, script, script_language)")
+    .eq("agent_id", agentId);
+
+  const skills = (assignments || []).map((row: any) => row.skills).filter(Boolean);
+  console.log("[provision] Baking", skills.length, "skills into VM");
+
   try {
     const result = provisionVM({
       agentId: agent.id,
+      organizationId: agent.organization_id,
       slackBotToken: agent.slack_access_token,
       slackSigningSecret: agent.slack_signing_secret,
       slackAuthedUserId: agent.slack_authed_user_id || "",
       aiProvider: agent.ai_provider || "anthropic",
       aiApiKey: agent.ai_api_key,
+      initialSkills: skills,
     });
 
     const eventsUrl = `${result.openclawUrl}/slack/events`;

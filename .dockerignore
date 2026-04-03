@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+.env*
+terraform/.terraform
+terraform-sa-key.json
+*.pem
+.DS_Store
+docs
+.planning

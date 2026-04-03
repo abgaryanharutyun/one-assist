@@ -17,14 +17,16 @@ provider "google" {
   region  = var.region
 }
 
-# Use first 8 chars of tenant UUID for short subdomain
+# Use first 8 chars for short identifiers in resource names
 locals {
+  org_short    = substr(var.org_id, 0, 8)
   tenant_short = substr(var.tenant_id, 0, 8)
+  name_prefix  = "oa-${local.org_short}-${local.tenant_short}"
   tenant_fqdn  = "${local.tenant_short}.${var.domain}"
 }
 
 resource "google_compute_address" "one-assist" {
-  name   = "one-assist-ip-${var.tenant_id}"
+  name   = "${local.name_prefix}-ip"
   region = var.region
 }
 
@@ -38,7 +40,7 @@ resource "google_dns_record_set" "tenant" {
 }
 
 resource "google_compute_instance" "one-assist" {
-  name         = "one-assist-${var.tenant_id}"
+  name         = "${local.name_prefix}-vm"
   machine_type = "e2-small"
   zone         = var.zone
 
@@ -69,6 +71,9 @@ resource "google_compute_instance" "one-assist" {
     instance_ip       = google_compute_address.one-assist.address
     gateway_token     = var.gateway_token
     letsencrypt_email = var.letsencrypt_email
+    platform_url        = var.platform_url
+    agent_id            = var.agent_id
+    initial_skills_json = var.initial_skills_json
   })
 
   scheduling {
@@ -80,6 +85,7 @@ resource "google_compute_instance" "one-assist" {
 
   labels = {
     tenant = var.tenant_id
+    org    = var.org_id
     app    = "one-assist"
   }
 
@@ -87,7 +93,7 @@ resource "google_compute_instance" "one-assist" {
 }
 
 resource "google_compute_firewall" "one-assist_https" {
-  name    = "one-assist-https-${var.tenant_id}"
+  name    = "${local.name_prefix}-fw"
   network = "default"
 
   allow {
