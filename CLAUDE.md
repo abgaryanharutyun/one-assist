@@ -13,38 +13,41 @@ pnpm lint       # ESLint
 
 ## Architecture
 
-Multi-tenant SaaS platform where each user gets a dedicated GCP VM running OpenClaw (AI assistant) connected to their Slack workspace.
+Multi-tenant SaaS platform where each organization can have multiple AI agents, each with a dedicated GCP VM running OpenClaw (AI assistant) connected to Slack.
 
 ### Flow
 
 1. **Signup** → Supabase Auth (email/password)
-2. **Onboarding wizard** (4 steps): paste Slack config token → set bot name/image → enter Anthropic API key → create app & OAuth authorize
-3. **Provisioning** → API route runs `terraform apply` to spawn a GCP Compute Engine VM per tenant
-4. **Post-provisioning** → Slack app manifest updated with webhook URL pointing to tenant VM
-5. **Dashboard** → shows connection status + link to OpenClaw web UI (with gateway token auth)
+2. **Onboarding** → create organization (name only)
+3. **Add Agent wizard** (4 steps): paste Slack config token → set bot name → enter Anthropic API key → create app & OAuth authorize
+4. **Provisioning** → API route runs `terraform apply` to spawn a GCP Compute Engine VM per agent
+5. **Post-provisioning** → Slack app manifest updated with webhook URL pointing to agent VM
+6. **Dashboard** → shows agent card grid with status + links to OpenClaw web UI (with gateway token auth)
 
 ### Key Integration Chain
 
 ```
 Slack Config Token → apps.manifest.create → OAuth redirect → token exchange
-  → tenant record updated → terraform apply (workspace per tenant)
+  → agent record updated (with organization_id) → terraform apply (workspace per agent)
   → GCP VM with OpenClaw + Nginx + Let's Encrypt SSL
   → Slack manifest updated with Events API webhook URL
-  → tenant.openclaw_url set → dashboard shows "active"
+  → agent.openclaw_url set → dashboard shows "active"
 ```
 
 ### Route Groups
 
 - `(auth)/` — login, signup (public, centered layout)
 - `(dashboard)/` — onboarding, dashboard (requires auth, header layout with signout)
+- `(dashboard)/agents/` — `new/` (add agent wizard), `[agentId]/` (agent detail/settings)
 
 ### API Routes
 
 | Route | Method | Does |
 |-------|--------|------|
-| `/api/onboarding/create-slack-app` | POST | Creates Slack app from manifest, stores credentials, returns OAuth URL |
-| `/api/onboarding/slack-callback` | GET | Exchanges OAuth code for tokens, triggers provisioning |
-| `/api/provision` | POST | Runs `terraform apply` for tenant, updates DB with VM details, updates Slack manifest with webhook URL |
+| `/api/onboarding/create-org` | POST | Creates organization for the user |
+| `/api/agents/create-slack-app` | POST | Creates Slack app from manifest for an agent, stores credentials, returns OAuth URL |
+| `/api/agents/slack-callback` | GET | Exchanges OAuth code for tokens, triggers agent provisioning |
+| `/api/agents/provision` | POST | Runs `terraform apply` for agent, updates DB with VM details, updates Slack manifest with webhook URL |
 | `/api/auth/signout` | POST | Signs out, redirects to `/login` |
 | `/api/health` | GET | Health check endpoint |
 
@@ -56,12 +59,12 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 
 ### Terraform Multi-Tenancy
 
-- One Terraform workspace per tenant: `tenant-{tenantId}`
+- One Terraform workspace per agent: `agent-{agentId}`
 - Each workspace creates: static IP, compute instance (e2-small, SPOT, Debian 12), firewall rule, Cloud DNS A record
 - State stored in GCS bucket `one-assist-tf-state`
 - `startup.sh` is a Terraform `templatefile()` — variables substituted at apply time, not shell runtime
 - VM runs OpenClaw as systemd service on `localhost:18789`, proxied via Nginx with Let's Encrypt SSL
-- Tenant subdomain: `{short-id}.{PLATFORM_DOMAIN}` (e.g. `abc123.local.oneassist.app`)
+- Agent subdomain: `{short-id}.{PLATFORM_DOMAIN}` (e.g. `abc123.local.oneassist.app`)
 
 ### OpenClaw VM Configuration
 
@@ -73,14 +76,19 @@ Slack Config Token → apps.manifest.create → OAuth redirect → token exchang
 
 ### Database
 
-Single `tenants` table with RLS (users can only access their own row). Status enum: `onboarding` → `provisioning` → `active` (or `error`/`stopped`). One tenant per user (unique constraint on `user_id`).
+Three main tables with RLS:
+- `organizations` — org name, created_by user
+- `org_members` — links users to organizations (role-based membership)
+- `agents` — each agent belongs to an organization (`organization_id`). Status enum: `onboarding` → `provisioning` → `active` (or `error`/`stopped`). Multiple agents per org.
 
 Migrations in `supabase/migrations/`:
-- `001_create_tenants.sql` — base table
+- `001_create_tenants.sql` — base tenants table (legacy)
 - `002_add_config_refresh_token.sql` — Slack config refresh token
 - `003_add_api_key.sql` — Anthropic API key storage
 - `004_add_gateway_token.sql` — OpenClaw gateway auth token
 - `005_add_slack_authed_user_id.sql` — Slack authed user ID for access control
+- `006_create_organizations.sql` — organizations and org_members tables
+- `007_create_agents.sql` — agents table (replaces tenants for new architecture)
 
 ## Environment Variables (.env.local)
 
@@ -113,4 +121,4 @@ LETSENCRYPT_EMAIL=your@email.com
 - App images uploaded to Supabase Storage bucket `app-images` (must be created in Supabase dashboard)
 - Commits must use `git -c commit.gpgSign=false commit` (no GPG signing)
 - OpenClaw Slack peer deps are not auto-installed — startup script must explicitly `npm install @slack/bolt @slack/web-api @slack/socket-mode`
-- To destroy a tenant VM: `terraform workspace select tenant-{id}` then `terraform destroy` with dummy vars for required variables
+- To destroy an agent VM: `terraform workspace select agent-{id}` then `terraform destroy` with dummy vars for required variables
