@@ -3,7 +3,6 @@ import { provisionVM } from "@/lib/terraform";
 import { updateSlackAppWithEventsUrl } from "@/lib/slack";
 import { NextResponse } from "next/server";
 
-// Use service role key to bypass RLS — this route is called internally
 function getAdminClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,53 +11,51 @@ function getAdminClient() {
 }
 
 export async function POST(request: Request) {
-  const { tenantId } = await request.json();
+  const { agentId } = await request.json();
 
   const supabase = getAdminClient();
 
-  const { data: tenant } = await supabase
-    .from("tenants")
+  const { data: agent } = await supabase
+    .from("agents")
     .select("*")
-    .eq("id", tenantId)
+    .eq("id", agentId)
     .single();
 
-  if (!tenant) {
-    return NextResponse.json({ error: "Tenant not found" }, { status: 404 });
+  if (!agent) {
+    return NextResponse.json({ error: "Agent not found" }, { status: 404 });
   }
 
-  console.log("[provision] Starting provisioning for tenant:", tenant.id);
+  console.log("[provision] Starting provisioning for agent:", agent.id);
 
   try {
     const result = provisionVM({
-      agentId: tenant.id,
-      slackBotToken: tenant.slack_access_token,
-      slackSigningSecret: tenant.slack_signing_secret,
-      slackAuthedUserId: tenant.slack_authed_user_id || "",
-      aiProvider: tenant.ai_provider || "anthropic",
-      aiApiKey: tenant.ai_api_key,
+      agentId: agent.id,
+      slackBotToken: agent.slack_access_token,
+      slackSigningSecret: agent.slack_signing_secret,
+      slackAuthedUserId: agent.slack_authed_user_id || "",
+      aiProvider: agent.ai_provider || "anthropic",
+      aiApiKey: agent.ai_api_key,
     });
 
-    // Update Slack app manifest with the events URL now that we have the VM URL
     const eventsUrl = `${result.openclawUrl}/slack/events`;
     const baseUrl = new URL(request.url).origin;
-    const redirectUrl = `${baseUrl}/api/onboarding/slack-callback`;
+    const redirectUrl = `${baseUrl}/api/agents/slack-callback`;
 
     try {
       await updateSlackAppWithEventsUrl(
-        tenant.slack_config_token,
-        tenant.slack_app_id,
-        tenant.slack_app_name,
+        agent.slack_config_token,
+        agent.slack_app_id,
+        agent.slack_app_name,
         redirectUrl,
         eventsUrl,
       );
       console.log("[provision] Updated Slack manifest with events URL:", eventsUrl);
     } catch (err: any) {
       console.error("[provision] Failed to update Slack manifest:", err.message);
-      // Non-fatal — the VM is still provisioned
     }
 
     await supabase
-      .from("tenants")
+      .from("agents")
       .update({
         vm_ip: result.vmIp,
         vm_name: result.vmName,
@@ -66,16 +63,16 @@ export async function POST(request: Request) {
         gateway_token: result.gatewayToken,
         status: "active",
       })
-      .eq("id", tenant.id);
+      .eq("id", agent.id);
 
     console.log("[provision] Success:", result);
     return NextResponse.json({ success: true });
   } catch (err: any) {
     console.error("[provision] Error:", err.message);
     await supabase
-      .from("tenants")
+      .from("agents")
       .update({ status: "error", error_message: err.message })
-      .eq("id", tenant.id);
+      .eq("id", agent.id);
 
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
