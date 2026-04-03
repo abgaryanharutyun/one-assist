@@ -42,3 +42,6 @@ next-env.d.ts
 
 # GCP service account keys
 terraform-sa-key.json
+
+# Terraform
+terraform/.terraform/
