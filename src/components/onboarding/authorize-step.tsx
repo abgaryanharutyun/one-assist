@@ -29,7 +29,7 @@ export function AuthorizeStep({ data, onBack }: Props) {
       formData.append("provider", data.provider);
       formData.append("apiKey", data.apiKey);
 
-      const res = await fetch("/api/onboarding/create-slack-app", {
+      const res = await fetch("/api/agents/create-slack-app", {
         method: "POST",
         body: formData,
       });

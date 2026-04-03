@@ -1,12 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
+import { getUserOrganization } from "@/lib/organizations";
 import { createSlackApp } from "@/lib/slack";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const org = await getUserOrganization(supabase);
 
-  if (!user) {
+  if (!org) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -22,14 +23,14 @@ export async function POST(request: Request) {
   }
 
   const baseUrl = new URL(request.url).origin;
-  const redirectUrl = `${baseUrl}/api/onboarding/slack-callback`;
+  const redirectUrl = `${baseUrl}/api/agents/slack-callback`;
 
   try {
     const { credentials, oauthUrl } = await createSlackApp(configToken, appName, redirectUrl);
 
-    // Upsert tenant record
-    await supabase.from("tenants").upsert({
-      user_id: user.id,
+    // Insert new agent record
+    const { data: agent, error } = await supabase.from("agents").insert({
+      organization_id: org.id,
       slack_config_token: configToken,
       slack_config_refresh_token: configRefreshToken,
       ai_provider: provider || "anthropic",
@@ -40,10 +41,16 @@ export async function POST(request: Request) {
       slack_client_secret: credentials.clientSecret,
       slack_signing_secret: credentials.signingSecret,
       status: "onboarding",
-    }, { onConflict: "user_id" });
+    }).select("id").single();
+
+    if (error) throw error;
+
+    // Append agentId as state param to OAuth URL so callback knows which agent
+    const oauthUrlWithState = `${oauthUrl}&state=${agent.id}`;
 
     return NextResponse.json({
-      oauthUrl,
+      agentId: agent.id,
+      oauthUrl: oauthUrlWithState,
       appSettingsUrl: `https://api.slack.com/apps/${credentials.appId}`,
     });
   } catch (err: any) {
